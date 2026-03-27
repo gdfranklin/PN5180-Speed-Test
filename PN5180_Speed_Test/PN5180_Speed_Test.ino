@@ -3,6 +3,8 @@
   Used on ESP32 WROOM 38pin
   Geoff Franklin
   March 27, 2026
+
+  Use library: https://github.com/tueddy/PN5180-Library
 */
 
 #include <PN5180ISO15693.h>
