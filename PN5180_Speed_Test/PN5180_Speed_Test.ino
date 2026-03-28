@@ -63,44 +63,42 @@ void showIRQStatus(uint32_t irqStatus) {
 }
 
 void loop() {
-  unsigned long commandTime = millis();
-  static int readCount = 0;       // number of consecutive valid reads
-  static int sequence = 0;
-  static unsigned long startTime; // start time of a series of good reads
-    
-  uint8_t uid[10];                // 8-byte integer array to store UID of detected tag
+  static int readCount = 0;           // number of consecutive valid reads
+  static int sequence = 1;        
+  static unsigned long firstSeenTime; // start time of a series of good reads  
+  uint8_t uid[10];                    // 8-byte integer array to store UID of detected tag
 
-  pn5180.commandTimeout = 50;     // reduce the timeout
-  int code =pn5180.getInventory(uid);
-  pn5180.commandTimeout = 500;    // restore the timeout
+  unsigned long commandStartTime = millis();
+  pn5180.commandTimeout = 50;         // reduce the timeout
+  int code =pn5180.getInventory(uid); // tag read function
+  pn5180.commandTimeout = 500;        // restore the timeout
+  unsigned long ElapsedTime = (millis() - commandStartTime);  
 
-  unsigned long ElapsedTime = (millis() - commandTime);  
-
-  if ( (ElapsedTime > 49)) {      // time out, failed read
-      Serial.printf("Failed Read, %d mSec. code: %d, ", ElapsedTime, code);
+  if ( (ElapsedTime > 49)) {          // time out, failed read
+      Serial.printf("Failed Read, code: %d, ", code);
       showIRQStatus(pn5180.getIRQStatus());
-      Serial.println();
-      pn5180.reset();             // reset the reader after failed read
+      Serial.printf(", Read Time %d mSec.\n", ElapsedTime);
+      commandStartTime = millis();
+      pn5180.reset();                 // reset the reader after failed read
       pn5180.setupRF();
+      ElapsedTime = (millis() - commandStartTime);    
+      Serial.printf("Reset Time, %d mSec.\n", ElapsedTime);
   }
-  if (code == ISO15693_EC_OK) {   // successful read
+  if (code == ISO15693_EC_OK) {       // successful read
     readCount++;  
-    if (readCount==1) {           // first successful read?
-      startTime = millis();
-
-      // If tag was found, print its ID to the serial monitor
-      sequence++;
+    if (readCount==1) {               // first successful read?
+      firstSeenTime = millis();
       static char UID[50];
       sprintf(UID, "%02X %02X %02X %02X %02X %02X %02X %02X", uid[7],uid[6],uid[5],uid[4],uid[3],uid[2],uid[1],uid[0]);
-      Serial.printf("Sequence: %d, UID: %s\n", sequence, UID);
+      Serial.printf("Sequence: %d, UID: %s, Read Time: %d mSec.\n", sequence++, UID, ElapsedTime);
     }  
   } 
   
-  else {                        // No tag in range
+  else {                            // No tag in range
     if (readCount>0) {
-      unsigned long ElapsedTime = (millis() - startTime);    
-      Serial.printf("%d mSec. reads: %d\n\n", ElapsedTime, readCount);                 
-      readCount = 0;            // reset
+      unsigned long timeSeen = (millis() - firstSeenTime);    
+      Serial.printf("Total Time Seen: %d mSec. reads: %d\n\n", timeSeen, readCount);                 
+      readCount = 0;                // reset
     }
   }  
 
