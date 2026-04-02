@@ -7,6 +7,7 @@
   Use library: https://github.com/tueddy/PN5180-Library
 */
 
+#include <PN5180.h>
 #include <PN5180ISO15693.h>
 
 // Define PN5180 NFC Readers
@@ -14,7 +15,8 @@
 #define NSS 21
 #define BUSY 22
 
-PN5180ISO15693 pn5180(NSS, BUSY, RST);
+PN5180ISO15693 reader(NSS, BUSY, RST);
+PN5180 pn5180(NSS, BUSY, RST);
 
 void setup() {
   // Serial interface for debugging only
@@ -28,10 +30,23 @@ void setup() {
   Serial.println(__DATE__);    
   Serial.println();
 
-  Serial.println("Setup Reader");
   pn5180.begin();
-  pn5180.reset();
-  pn5180.setupRF();
+  delay(100);
+
+  // get version
+  Serial.print("PN5180 Version: ");
+  uint8_t productVersion[2];
+  pn5180.readEEprom(PRODUCT_VERSION, productVersion, sizeof(productVersion));
+  uint8_t firmwareVersion[2];
+  pn5180.readEEprom(FIRMWARE_VERSION, firmwareVersion, sizeof(firmwareVersion));
+  uint8_t eepromVersion[2];
+  pn5180.readEEprom(EEPROM_VERSION, eepromVersion, sizeof(eepromVersion));
+  Serial.printf("Product: %d.%d   Firmware: %d.%d   EEPROM: %d.%d\n", productVersion[1], productVersion[0], firmwareVersion[1], firmwareVersion[0], eepromVersion[1], eepromVersion[0]);
+
+  Serial.println("Setup Reader");
+  reader.begin();
+  reader.reset();
+  reader.setupRF();
   Serial.println("Ready");
 }
 
@@ -69,21 +84,23 @@ void loop() {
   uint8_t uid[10];                    // 8-byte integer array to store UID of detected tag
 
   unsigned long commandStartTime = millis();
-  pn5180.commandTimeout = 50;         // reduce the timeout
-  int code =pn5180.getInventory(uid); // tag read function
-  pn5180.commandTimeout = 500;        // restore the timeout
+  reader.commandTimeout = 20;         // reduce the timeout
+  int code =reader.getInventory(uid); // tag read function
+  reader.commandTimeout = 500;        // restore the timeout
   unsigned long ElapsedTime = (millis() - commandStartTime);  
 
-  if ( (ElapsedTime > 49)) {          // time out, failed read
+  if ( (ElapsedTime > 40)) {          // time out, failed read
       Serial.printf("Failed Read, code: %d, ", code);
-      showIRQStatus(pn5180.getIRQStatus());
+      showIRQStatus(reader.getIRQStatus());
       Serial.printf(", Read Time %d mSec.\n", ElapsedTime);
       commandStartTime = millis();
-      pn5180.reset();                 // reset the reader after failed read
-      pn5180.setupRF();
+      reader.reset();                 // reset the reader after failed read
+      reader.setupRF();
       ElapsedTime = (millis() - commandStartTime);    
       Serial.printf("Reset Time, %d mSec.\n", ElapsedTime);
+      return;
   }
+  
   if (code == ISO15693_EC_OK) {       // successful read
     readCount++;  
     if (readCount==1) {               // first successful read?
